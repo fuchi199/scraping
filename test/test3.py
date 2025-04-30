@@ -1,11 +1,10 @@
 import ssl
 import aiohttp
 import asyncio
-import nest_asyncio
 import pandas as pd
 
-ACCESS_TOKEN = "rt_F7708875CF6BDC12FB526F3A76B48FBB6B7F19CD91BA1544424D0000B4CEE729-1"
-API_BASE = "https://cloud.uipath.com/qkwjazie/DefaultTenant/orchestrator_/odata"
+ACCESS_TOKEN = ""
+API_BASE = ""
 
 HEADERS = {
     "Authorization": f"Bearer {ACCESS_TOKEN}",
@@ -23,35 +22,42 @@ async def fetch_queue_definitions(session):
         data = await resp.json()
         return data.get("value", [])
 
-async def fetch_inprogress_transactions(session, queue_definition_id, name, en):
+async def fetch_all_inprogress(session, queue_definition_id, name, en):
     url = f"{API_BASE}/QueueItems"
     params = {
         "$filter": f"QueueDefinitionId eq {queue_definition_id} and Status eq 'InProgress'",
         "$top": 100
     }
-    async with session.get(url, headers=HEADERS, params=params) as resp:
-        resp.raise_for_status()
-        items = await resp.json()
-        items = items.get("value", [])
-        
-        return [{
-            "name": name,
-            "en": en,
-            "item_url": itm['Id'],
-            "title": itm['Status'],
-            "price": itm.get('StartProcessingTime')
-        } for itm in items]
+
+    items = []
+    while url:
+        async with session.get(url, headers=HEADERS, params=params) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
+            values = data.get("value", [])
+            items.extend(values)
+            url = data.get("@odata.nextLink", None)
+            params = None  # nextLinkにはすでにパラメータが入ってる
+
+    return [{
+        "name": name,
+        "en": en,
+        "item_url": itm['Id'],
+        "title": itm['Status'],
+        "price": itm.get('StartProcessingTime')
+    } for itm in items]
 
 async def main():
     async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
         queues = await fetch_queue_definitions(session)
-        tasks = []
-        for q in queues:
-            tasks.append(fetch_inprogress_transactions(session, q['Id'], q['Name'], q.get('EntriesCount')))
+        tasks = [fetch_all_inprogress(session, q['Id'], q['Name'], q.get('EntriesCount')) for q in queues]
         results = await asyncio.gather(*tasks)
-        # フラットにまとめる
         all_items = [item for sublist in results for item in sublist]
-        df = pd.DataFrame(all_items)
+
+        # 重複除去（Idベースで）
+        unique_items = {item["item_url"]: item for item in all_items}.values()
+
+        df = pd.DataFrame(unique_items)
         print(df)
 
 if __name__ == "__main__":
