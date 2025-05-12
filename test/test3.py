@@ -2,6 +2,7 @@ import ssl
 import aiohttp
 import asyncio
 import pandas as pd
+from datetime import datetime, timedelta
 
 ACCESS_TOKEN = ""
 API_BASE = ""
@@ -29,23 +30,31 @@ async def fetch_all_inprogress(session, queue_definition_id, name, en):
         "$top": 100
     }
 
-    items = []
-    while url:
-        async with session.get(url, headers=HEADERS, params=params) as resp:
-            resp.raise_for_status()
-            data = await resp.json()
-            values = data.get("value", [])
-            items.extend(values)
-            url = data.get("@odata.nextLink", None)
-            params = None  # nextLinkにはすでにパラメータが入ってる
+    async with session.get(url, headers=HEADERS, params=params) as resp:
+        resp.raise_for_status()
+        data = await resp.json()
+        items = data.get("value", [])
+ 
+    now = datetime.now()
+    threshold = now - timedelta(minutes=20)
+    filtered = []
+    for itm in items:
+        start_time = itm.get('StartProcessingTime')
+        if start_time:
+            try:
+                dt = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S.%fZ")
+            except ValueError:
+                dt = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%SZ")
+            if dt <= threshold:
+                filtered.append({
+                    "name": name,
+                    "en": en,
+                    "item_url": itm['Id'],
+                    "title": itm['Status'],
+                    "price": start_time
+                })
 
-    return [{
-        "name": name,
-        "en": en,
-        "item_url": itm['Id'],
-        "title": itm['Status'],
-        "price": itm.get('StartProcessingTime')
-    } for itm in items]
+    return filtered
 
 async def main():
     async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
