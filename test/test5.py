@@ -39,3 +39,15 @@ for item in output:
 # 配列に格納
 result = [{"name": name, "count": count} for name, count in counts.items()]
 
+
+import pandas as pd
+
+# 例のデータフレーム
+df1 = pd.DataFrame({"name": ["太郎", "一郎"], "count": [2, 2]})
+df2 = pd.DataFrame({"age": [21, 24, 25, 27]})
+
+# Excelファイルに書き出し（複数シート）
+with pd.ExcelWriter("a.xlsx", engine="openpyxl") as writer:
+    df1.to_excel(writer, sheet_name="Summary", index=False)
+    df2.to_excel(writer, sheet_name="AgeData", index=False)
+
