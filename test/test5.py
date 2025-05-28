@@ -21,3 +21,21 @@ output = [
 ]
 
 print(output)
+
+from collections import defaultdict
+
+output = [
+    {"name": "太郎", "id": 2, "age": "21"},
+    {"name": "太郎", "id": 2, "age": "24"},
+    {"name": "一郎", "id": 5, "age": "25"},
+    {"name": "一郎", "id": 5, "age": "27"}
+]
+
+# 件数カウント
+counts = defaultdict(int)
+for item in output:
+    counts[item["name"]] += 1
+
+# 配列に格納
+result = [{"name": name, "count": count} for name, count in counts.items()]
+
