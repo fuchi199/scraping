@@ -51,3 +51,47 @@ with pd.ExcelWriter("a.xlsx", engine="openpyxl") as writer:
     df1.to_excel(writer, sheet_name="Summary", index=False)
     df2.to_excel(writer, sheet_name="AgeData", index=False)
 
+
+data = [{"id": i, "name": f"name{i}"} for i in range(501)]
+
+chunk_size = 100
+
+for i in range(0, len(data), chunk_size):
+    chunk = data[i:i + chunk_size]
+    # ここにchunkを処理する関数を呼び出すなど
+    print(f"{i//chunk_size + 1} バッチ目: {len(chunk)} 件")
+
+
+
+import aiohttp
+import asyncio
+
+# ダミーAPIのURL（あなたのAPIエンドポイントに差し替えてください）
+API_URL = "https://example.com/api/send"
+
+# 送信関数（非同期）
+async def send_chunk(session, chunk):
+    try:
+        async with session.post(API_URL, json=chunk) as resp:
+            resp.raise_for_status()
+            result = await resp.json()
+            print(f"送信完了: {len(chunk)}件, レスポンス: {result}")
+    except Exception as e:
+        print(f"送信エラー: {e}")
+
+# メイン処理
+async def main():
+    # サンプルデータ（500件）
+    data = [{"id": i, "name": f"name{i}"} for i in range(1, 501)]
+    chunk_size = 100
+
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for i in range(0, len(data), chunk_size):
+            chunk = data[i:i + chunk_size]
+            tasks.append(send_chunk(session, chunk))
+        await asyncio.gather(*tasks)
+
+# 実行
+if __name__ == "__main__":
+    asyncio.run(main())
